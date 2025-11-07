@@ -14,9 +14,8 @@ export default function Callback() {
         return;
       }
 
-      // Se la sessione esiste, reindirizza alla homepage
       if (data?.session) {
-        router.push("/");
+        router.push("/"); // reindirizza alla homepage
       } else {
         router.push("/?error=auth");
       }
