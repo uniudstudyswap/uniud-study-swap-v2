@@ -17,30 +17,35 @@ export default function Home() {
     getSession();
 
     // Ascolta cambiamenti di sessione (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+      }
+    );
 
     return () => {
       subscription.unsubscribe();
     };
   }, []);
 
+  // LOGIN GOOGLE
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin, // Torna al sito dopo login
+        redirectTo: `${window.location.origin}/auth/callback`, // 🔥 reindirizza alla pagina di callback
       },
     });
     if (error) console.error("Errore login Google:", error.message);
   };
 
+  // LOGOUT
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) console.error("Errore logout:", error.message);
   };
 
+  // Loading iniziale
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
@@ -49,11 +54,13 @@ export default function Home() {
     );
   }
 
+  // Schermata di LOGIN
   if (!session) {
-    // Schermata di login
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
-        <h1 className="text-3xl font-bold mb-4 text-gray-800">UniUD StudySwap</h1>
+        <h1 className="text-3xl font-bold mb-4 text-gray-800">
+          UniUD StudySwap
+        </h1>
         <p className="text-gray-600 mb-6">
           Accedi per vendere o acquistare appunti e libri.
         </p>
@@ -67,7 +74,7 @@ export default function Home() {
     );
   }
 
-  // Schermata loggata
+  // Schermata LOGGATA
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
       <h1 className="text-2xl font-bold mb-2 text-gray-800">
@@ -85,3 +92,4 @@ export default function Home() {
     </div>
   );
 }
+
