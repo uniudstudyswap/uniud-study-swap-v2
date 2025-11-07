@@ -1,26 +1,24 @@
 import { useEffect } from "react";
-import { supabase } from "../../supabaseClient";
 import { useRouter } from "next/router";
+import { supabase } from "../../supabaseClient";
 
 export default function Callback() {
   const router = useRouter();
 
   useEffect(() => {
     const handleAuth = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
+      const { data, error } = await supabase.auth.getSession();
 
-        // Se la sessione è valida, reindirizza alla home
-        if (data.session) {
-          router.push("/");
-        } else {
-          console.warn("Nessuna sessione trovata, ritorno alla home.");
-          router.push("/");
-        }
-      } catch (err) {
-        console.error("Errore callback:", err.message);
+      if (error) {
+        console.error("Errore nel recupero sessione:", error.message);
+        return;
+      }
+
+      // Se la sessione esiste, reindirizza alla homepage
+      if (data?.session) {
         router.push("/");
+      } else {
+        router.push("/?error=auth");
       }
     };
 
@@ -28,8 +26,11 @@ export default function Callback() {
   }, [router]);
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
-      <p className="text-gray-600 text-lg">Accesso in corso...</p>
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
+      <h1 className="text-xl font-bold mb-4 text-gray-700">
+        Autenticazione in corso...
+      </h1>
+      <p className="text-gray-500">Attendi qualche secondo.</p>
     </div>
   );
 }
