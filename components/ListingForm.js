@@ -1,96 +1,89 @@
-// components/listingform.js
 import { useState } from "react";
 import { supabase } from "../supabaseClient";
 
-export default function ListingForm({ onNewListing }) {
+export default function ListingForm({ refreshListings }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
+  const [category, setCategory] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    if (!title || !description || !category || !price) {
-      alert("Per favore compila tutti i campi.");
-      return;
-    }
+    const user = supabase.auth.getSession().then(({ data }) => data?.session?.user);
 
-    const { data, error } = await supabase
-      .from("listings")
-      .insert([
-        {
-          title,
-          description,
-          category,
-          price: parseFloat(price),
-        },
-      ]);
+    const { error } = await supabase.from("listings").insert([
+      {
+        title,
+        description,
+        price: parseFloat(price),
+        category,
+        user_id: (await user)?.id,
+      },
+    ]);
 
     if (error) {
       console.error("Errore nell'inserimento dell'annuncio:", error);
-      alert("Si è verificato un errore. Riprova.");
+      alert("Errore nell'inserimento dell'annuncio. Controlla i dati.");
     } else {
-      alert("Annuncio inserito con successo!");
       setTitle("");
       setDescription("");
-      setCategory("");
       setPrice("");
-      if (onNewListing) onNewListing(data[0]); // aggiorna la lista degli annunci nel parent
+      setCategory("");
+      if (refreshListings) refreshListings(); // Aggiorna la lista nel componente principale
     }
+
+    setLoading(false);
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-      <h2 className="text-xl font-bold mb-4">Inserisci un nuovo annuncio</h2>
-      <form onSubmit={handleSubmit}>
-        <label className="block text-gray-700 text-sm font-bold mb-2">
-          Titolo
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          />
-        </label>
+    <form onSubmit={handleSubmit} className="border p-4 rounded-lg shadow mb-6">
+      <h2 className="font-bold text-lg mb-4">Inserisci un nuovo annuncio</h2>
 
-        <label className="block text-gray-700 text-sm font-bold mb-2">
-          Descrizione
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          />
-        </label>
+      <input
+        type="text"
+        placeholder="Titolo"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        className="border p-2 rounded w-full mb-3"
+        required
+      />
 
-        <label className="block text-gray-700 text-sm font-bold mb-2">
-          Categoria
-          <input
-            type="text"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          />
-        </label>
+      <textarea
+        placeholder="Descrizione"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        className="border p-2 rounded w-full mb-3"
+        required
+      />
 
-        <label className="block text-gray-700 text-sm font-bold mb-2">
-          Prezzo (€)
-          <input
-            type="number"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            step="0.01"
-          />
-        </label>
+      <input
+        type="number"
+        placeholder="Prezzo (€)"
+        value={price}
+        onChange={(e) => setPrice(e.target.value)}
+        className="border p-2 rounded w-full mb-3"
+        required
+        step="0.01"
+      />
 
-        <button
-          type="submit"
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline mt-4"
-        >
-          Inserisci Annuncio
-        </button>
-      </form>
-    </div>
+      <input
+        type="text"
+        placeholder="Categoria"
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+        className="border p-2 rounded w-full mb-3"
+      />
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+      >
+        {loading ? "Caricamento..." : "Aggiungi Annuncio"}
+      </button>
+    </form>
   );
 }
