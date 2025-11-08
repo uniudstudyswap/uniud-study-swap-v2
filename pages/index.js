@@ -1,101 +1,87 @@
+// pages/index.js
 import { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
+import { supabase } from "../supabaseClient"; // Assicurati che supabaseClient.js sia nella root
 import ListingForm from "../components/ListingForm";
 import ListingDetail from "../components/ListingDetail";
 
 export default function Home() {
   const [session, setSession] = useState(null);
-  const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedListingId, setSelectedListingId] = useState(null);
+  const [listings, setListings] = useState([]);
 
   useEffect(() => {
     const getSession = async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getSession();
+      if (error) console.error("Errore nel recupero sessione:", error);
       setSession(data?.session ?? null);
       setLoading(false);
     };
+
     getSession();
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
     fetchListings();
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const fetchListings = async () => {
-    const { data, error } = await supabase.from("listings").select("*");
-    if (error) console.error(error);
+    const { data, error } = await supabase.from("listings").select("*").order("created_at", { ascending: false });
+    if (error) console.error("Errore fetch listings:", error);
     else setListings(data);
   };
 
   const handleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
     });
+    if (error) console.error("Errore login Google:", error.message);
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error("Errore logout:", error.message);
   };
 
-  const handleListingCreated = (newListing) => {
-    setListings([newListing, ...listings]);
-  };
-
-  if (loading) return <p>Caricamento...</p>;
+  if (loading) return <div className="flex items-center justify-center h-screen">Caricamento...</div>;
 
   if (!session) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
-        <h1 className="text-3xl font-bold mb-4">UniUD StudySwap</h1>
-        <button
-          onClick={handleLogin}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-        >
+        <h1 className="text-3xl font-bold mb-4 text-gray-800">UniUD StudySwap</h1>
+        <p className="text-gray-600 mb-6">Accedi per vendere o acquistare appunti e libri.</p>
+        <button onClick={handleLogin} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg">
           Accedi con Google
         </button>
       </div>
     );
   }
 
-  if (selectedListingId) {
-    return <ListingDetail listingId={selectedListingId} />;
-  }
-
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">Marketplace</h2>
-        <button
-          onClick={handleLogout}
-          className="bg-gray-800 text-white px-4 py-2 rounded"
-        >
-          Esci
-        </button>
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Benvenuto, {session.user.email}</h1>
+        <button onClick={handleLogout} className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg">Esci</button>
       </div>
 
-      <ListingForm userId={session.user.id} onListingCreated={handleListingCreated} />
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-2">Inserisci un annuncio</h2>
+        <ListingForm session={session} onNewListing={fetchListings} />
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {listings.map((listing) => (
-          <div
-            key={listing.id}
-            className="p-4 border rounded hover:shadow cursor-pointer"
-            onClick={() => setSelectedListingId(listing.id)}
-          >
-            <h3 className="font-semibold">{listing.title}</h3>
-            <p>{listing.description}</p>
-            <p className="font-bold">€{listing.price}</p>
-          </div>
-        ))}
+      <div>
+        <h2 className="text-xl font-semibold mb-2">Annunci disponibili</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {listings.map(listing => (
+            <ListingDetail key={listing.id} listing={listing} />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
+
