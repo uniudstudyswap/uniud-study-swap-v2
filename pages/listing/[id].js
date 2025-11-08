@@ -1,80 +1,53 @@
-import { useEffect, useState } from "react";
-import { useRouter } from "next/router";
 import { supabase } from "../../supabaseClient";
+import { loadStripe } from "@stripe/stripe-js";
 
-export default function ListingDetail() {
-  const router = useRouter();
-  const { id } = router.query;
-  const [listing, setListing] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
-  useEffect(() => {
-    if (!id) return;
+export default function ListingPage({ listing }) {
+  const handleBuy = async () => {
+    const stripe = await stripePromise;
 
-    const fetchListing = async () => {
-      const { data, error } = await supabase
-        .from("listings")
-        .select("*")
-        .eq("id", id)
-        .single();
+    const response = await fetch("/api/create-checkout-session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: listing.title,
+        price: listing.price,
+      }),
+    });
 
-      if (error) console.error("Errore fetch listing:", error);
-      else setListing(data);
-
-      setLoading(false);
-    };
-
-    fetchListing();
-  }, [id]);
-
-  const handleCheckout = async () => {
-    setCheckoutLoading(true);
-    try {
-      const response = await fetch("/api/create-checkout-session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          listingId: listing.id,
-          title: listing.title,
-          price: listing.price,
-        }),
-      });
-
-      const data = await response.json();
-      if (data.sessionUrl) {
-        window.location.href = data.sessionUrl;
-      } else {
-        console.error("Errore nella creazione sessione Stripe:", data);
-      }
-    } catch (error) {
-      console.error("Errore nel redirect a Stripe:", error);
-    } finally {
-      setCheckoutLoading(false);
-    }
+    const data = await response.json();
+    await stripe.redirectToCheckout({ sessionId: data.id });
   };
 
-  if (loading) return <p>Caricamento annuncio...</p>;
-  if (!listing) return <p>Annuncio non trovato.</p>;
-
   return (
-    <div className="p-6 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold mb-2">{listing.title}</h1>
-      <p className="mb-2">{listing.description}</p>
-      <p className="mb-2">Categoria: {listing.category}</p>
-      <p className="mb-4 font-semibold">Prezzo: €{listing.price}</p>
-
+    <div className="p-8">
+      <h1 className="text-2xl font-bold">{listing.title}</h1>
+      <p className="mt-4">{listing.description}</p>
+      <p className="mt-2 font-semibold">Prezzo: €{listing.price}</p>
       <button
-        onClick={handleCheckout}
-        className={`bg-green-600 text-white px-4 py-2 rounded shadow ${
-          checkoutLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-green-700"
-        }`}
-        disabled={checkoutLoading}
+        onClick={handleBuy}
+        className="mt-4 bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700"
       >
-        {checkoutLoading ? "Reindirizzamento..." : "Acquista"}
+        Acquista
       </button>
     </div>
   );
+}
+
+// Recupera i dati del singolo annuncio
+export async function getServerSideProps({ params }) {
+  const { data: listing, error } = await supabase
+    .from("listings")
+    .select("*")
+    .eq("id", params.id)
+    .single();
+
+  if (error) {
+    return { notFound: true };
+  }
+
+  return { props: { listing } };
 }

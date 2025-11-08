@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../supabaseClient";
 
-export default function ListingForm({ onListingAdded }) {
+export default function ListingForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
@@ -10,62 +10,66 @@ export default function ListingForm({ onListingAdded }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const { data, error } = await supabase.from("listings").insert([
-      {
-        title,
-        description,
-        category,
-        price,
-        user_id: supabase.auth.getUser()?.data?.user?.id,
-      },
-    ]);
+    const { data, error } = await supabase
+      .from("listings")
+      .insert([
+        {
+          title,
+          description,
+          category,
+          price: parseFloat(price),
+        },
+      ]);
 
-    if (error) console.error("Errore inserimento:", error);
-    else {
+    if (error) {
+      console.error("Errore inserimento annuncio:", error);
+    } else {
+      alert("Annuncio inserito con successo!");
       setTitle("");
       setDescription("");
       setCategory("");
       setPrice("");
-      if (onListingAdded) onListingAdded(data[0]);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border p-4 rounded-lg shadow mb-6">
-      <h2 className="text-lg font-bold mb-2">Crea un annuncio</h2>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <input
         type="text"
         placeholder="Titolo"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="border p-2 mb-2 w-full"
         required
+        className="border px-3 py-2 rounded"
       />
       <textarea
         placeholder="Descrizione"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        className="border p-2 mb-2 w-full"
         required
+        className="border px-3 py-2 rounded"
       />
       <input
         type="text"
         placeholder="Categoria"
         value={category}
         onChange={(e) => setCategory(e.target.value)}
-        className="border p-2 mb-2 w-full"
         required
+        className="border px-3 py-2 rounded"
       />
       <input
         type="number"
-        placeholder="Prezzo"
+        placeholder="Prezzo (€)"
         value={price}
         onChange={(e) => setPrice(e.target.value)}
-        className="border p-2 mb-2 w-full"
         required
+        className="border px-3 py-2 rounded"
       />
-      <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded">
-        Pubblica annuncio
+      <button
+        type="submit"
+        className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+      >
+        Inserisci Annuncio
       </button>
     </form>
   );
