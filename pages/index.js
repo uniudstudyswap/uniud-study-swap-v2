@@ -1,37 +1,40 @@
+// pages/index.js
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import ListingForm from "../components/listingform";
-import { loadStripe } from "@stripe/stripe-js";
-
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 export default function Home() {
   const [session, setSession] = useState(null);
-  const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [listings, setListings] = useState([]);
 
+  // Carica sessione e annunci
   useEffect(() => {
-    const getSession = async () => {
-      const { data } = await supabase.auth.getSession();
+    const fetchSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) console.error(error);
       setSession(data?.session ?? null);
       setLoading(false);
     };
-    getSession();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const fetchListings = async () => {
+      const { data, error } = await supabase
+        .from("listings")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) console.error(error);
+      else setListings(data);
+    };
+
+    fetchSession();
+    fetchListings();
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
-    fetchListings();
-
-    return () => listener.subscription.unsubscribe();
+    return () => subscription?.unsubscribe();
   }, []);
-
-  const fetchListings = async () => {
-    const { data, error } = await supabase.from("listings").select("*").order("created_at", { ascending: false });
-    if (error) console.error(error);
-    else setListings(data);
-  };
 
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -46,29 +49,17 @@ export default function Home() {
     if (error) console.error(error.message);
   };
 
-  const handleBuy = async (listing) => {
-    const stripe = await stripePromise;
-
-    const response = await fetch("/api/create-checkout-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ listing }),
-    });
-    const session = await response.json();
-
-    const result = await stripe.redirectToCheckout({ sessionId: session.id });
-    if (result.error) console.error(result.error.message);
-  };
-
-  if (loading) return <p className="text-center mt-10">Caricamento...</p>;
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">Caricamento...</div>;
+  }
 
   if (!session) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen">
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
         <h1 className="text-3xl font-bold mb-4">UniUD StudySwap</h1>
         <button
           onClick={handleLogin}
-          className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg shadow-md"
         >
           Accedi con Google
         </button>
@@ -77,31 +68,28 @@ export default function Home() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 bg-gray-50 min-h-screen">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Marketplace</h1>
-        <button onClick={handleLogout} className="bg-gray-800 text-white px-4 py-2 rounded">
+        <h1 className="text-2xl font-bold">Benvenuto, {session.user.email}</h1>
+        <button
+          onClick={handleLogout}
+          className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg"
+        >
           Esci
         </button>
       </div>
 
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">Inserisci un nuovo annuncio</h2>
-        <ListingForm />
-      </div>
+      <ListingForm onNewListing={(newListing) => setListings([newListing, ...listings])} />
 
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Annunci disponibili</h2>
+      <h2 className="text-xl font-bold mt-8 mb-4">Annunci</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {listings.map((listing) => (
-          <div key={listing.id} className="border p-4 mb-4 rounded">
-            <h3 className="text-lg font-bold">{listing.title}</h3>
-            <p>{listing.description}</p>
-            <p className="font-semibold">Categoria: {listing.category}</p>
-            <p className="font-semibold">Prezzo: €{listing.price}</p>
-            <button
-              onClick={() => handleBuy(listing)}
-              className="mt-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
+          <div key={listing.id} className="border rounded p-4 bg-white shadow">
+            <h3 className="font-bold text-lg">{listing.title}</h3>
+            <p className="text-gray-700">{listing.description}</p>
+            <p className="text-gray-500 mt-2">Categoria: {listing.category}</p>
+            <p className="text-gray-900 font-semibold mt-2">Prezzo: €{listing.price}</p>
+            <button className="mt-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
               Acquista
             </button>
           </div>
