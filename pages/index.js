@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
-import ListingForm from "../components/listingform";
+import ListingForm from "./components/listingform";
 
 export default function Home() {
   const [session, setSession] = useState(null);
