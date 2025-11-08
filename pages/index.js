@@ -25,6 +25,24 @@ export default function Home() {
 
     fetchListings();
 
+const handleBecomeSeller = async () => {
+  try {
+    const res = await fetch("/api/create-seller-account", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: session.user.id }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url; // reindirizza l'utente a Stripe
+    } else {
+      console.error("Errore nella creazione account venditore:", data);
+    }
+  } catch (err) {
+    console.error("Errore become seller:", err);
+  }
+};
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -81,6 +99,14 @@ export default function Home() {
         <button
           onClick={handleLogout}
           className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg"
+
+<button
+  onClick={handleBecomeSeller}
+  className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg shadow transition mt-4"
+>
+  Diventa venditore
+</button>
+
         >
           Esci
         </button>
