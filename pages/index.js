@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
+import Link from "next/link";
 import ListingForm from "../components/ListingForm";
 
 export default function Home() {
@@ -9,7 +10,7 @@ export default function Home() {
   useEffect(() => {
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
-      setSession(data?.session ?? null);
+      setSession(data.session);
     };
     getSession();
 
@@ -21,23 +22,22 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (session) fetchListings();
-  }, [session]);
-
-  async function fetchListings() {
-    const { data, error } = await supabase.from("listings").select("*").order("created_at", { ascending: false });
-    if (error) console.error(error);
-    else setListings(data);
-  }
+    const fetchListings = async () => {
+      const { data, error } = await supabase.from("listings").select("*").order("id", { ascending: false });
+      if (!error) setListings(data);
+    };
+    fetchListings();
+  }, []);
 
   if (!session) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
-        <h1 className="text-3xl font-bold mb-4 text-gray-800">UniUD StudySwap</h1>
-        <p className="text-gray-600 mb-6">Accedi per vendere o acquistare appunti e libri.</p>
+        <h1 className="text-3xl font-bold mb-4">UniUD StudySwap</h1>
         <button
-          onClick={() => supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + "/auth/callback" } })}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg shadow-md transition"
+          onClick={() =>
+            supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } })
+          }
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg"
         >
           Accedi con Google
         </button>
@@ -46,21 +46,21 @@ export default function Home() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Benvenuto, {session.user.email}</h1>
-      <ListingForm onListingAdded={fetchListings} />
+    <div className="min-h-screen bg-gray-50 p-8">
+      <h1 className="text-3xl font-bold mb-4 text-center">Benvenuto, {session.user.email}</h1>
 
-      <h2 className="text-xl font-semibold mt-8 mb-4">Annunci disponibili</h2>
-      <div className="grid gap-4">
-        {listings.map((item) => (
-          <div key={item.id} className="border p-4 rounded shadow hover:shadow-lg transition">
-            <h3 className="text-lg font-bold">{item.title}</h3>
-            <p>{item.description}</p>
-            <p className="text-gray-700">💰 {item.price} €</p>
-            <button className="mt-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-              Acquista
-            </button>
-          </div>
+      <ListingForm />
+
+      <h2 className="text-2xl font-semibold mt-8 mb-4">Annunci disponibili</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {listings.map((listing) => (
+          <Link key={listing.id} href={`/listing/${listing.id}`} passHref>
+            <div className="border rounded-lg p-4 bg-white shadow hover:shadow-lg transition cursor-pointer">
+              <h3 className="text-lg font-bold mb-2">{listing.title}</h3>
+              <p className="text-gray-600 mb-2">{listing.description}</p>
+              <p className="text-blue-600 font-semibold">{listing.price} €</p>
+            </div>
+          </Link>
         ))}
       </div>
     </div>
