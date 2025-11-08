@@ -1,72 +1,68 @@
 import { useState } from "react";
 import { supabase } from "../supabaseClient";
 
-export default function ListingForm({ refreshListings }) {
+export default function ListingForm({ onNewListing }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
+  const [price, setPrice] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    const user = supabase.auth.getSession().then(({ data }) => data?.session?.user);
-
-    const { error } = await supabase.from("listings").insert([
-      {
-        title,
-        description,
-        price: parseFloat(price),
-        category,
-        user_id: (await user)?.id,
-      },
-    ]);
-
-    if (error) {
-      console.error("Errore nell'inserimento dell'annuncio:", error);
-      alert("Errore nell'inserimento dell'annuncio. Controlla i dati.");
-    } else {
-      setTitle("");
-      setDescription("");
-      setPrice("");
-      setCategory("");
-      if (refreshListings) refreshListings(); // Aggiorna la lista nel componente principale
-    }
+    const { data, error } = await supabase
+      .from("listings")
+      .insert([
+        {
+          title,
+          description,
+          category,
+          price: parseFloat(price),
+        },
+      ]);
 
     setLoading(false);
+
+    if (error) {
+      console.error("Errore inserimento listing:", error);
+      alert("Errore durante l'inserimento dell'annuncio.");
+      return;
+    }
+
+    // Reset form
+    setTitle("");
+    setDescription("");
+    setCategory("");
+    setPrice("");
+
+    // Aggiorna la lista di annunci in index.js
+    if (onNewListing) onNewListing(data[0]);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border p-4 rounded-lg shadow mb-6">
-      <h2 className="font-bold text-lg mb-4">Inserisci un nuovo annuncio</h2>
+    <form
+      onSubmit={handleSubmit}
+      className="bg-white p-6 rounded-lg shadow-md max-w-md mx-auto"
+    >
+      <h2 className="text-xl font-bold mb-4">Crea un nuovo annuncio</h2>
 
       <input
         type="text"
         placeholder="Titolo"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="border p-2 rounded w-full mb-3"
         required
+        className="w-full mb-3 p-2 border rounded"
       />
 
       <textarea
         placeholder="Descrizione"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        className="border p-2 rounded w-full mb-3"
         required
-      />
-
-      <input
-        type="number"
-        placeholder="Prezzo (€)"
-        value={price}
-        onChange={(e) => setPrice(e.target.value)}
-        className="border p-2 rounded w-full mb-3"
-        required
-        step="0.01"
+        className="w-full mb-3 p-2 border rounded"
       />
 
       <input
@@ -74,15 +70,25 @@ export default function ListingForm({ refreshListings }) {
         placeholder="Categoria"
         value={category}
         onChange={(e) => setCategory(e.target.value)}
-        className="border p-2 rounded w-full mb-3"
+        required
+        className="w-full mb-3 p-2 border rounded"
+      />
+
+      <input
+        type="number"
+        placeholder="Prezzo"
+        value={price}
+        onChange={(e) => setPrice(e.target.value)}
+        required
+        className="w-full mb-3 p-2 border rounded"
       />
 
       <button
         type="submit"
         disabled={loading}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
       >
-        {loading ? "Caricamento..." : "Aggiungi Annuncio"}
+        {loading ? "Caricamento..." : "Pubblica annuncio"}
       </button>
     </form>
   );
