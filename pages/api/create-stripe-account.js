@@ -4,43 +4,41 @@ import { supabase } from "../../supabaseClient";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
-  if (req.method === "POST") {
-    const { userId } = req.body;
+  if (req.method !== "POST") return res.status(405).end();
 
-    try {
-      // Crea account Stripe Express per il venditore
-      const account = await stripe.accounts.create({
-        type: "express",
-        country: "IT",
-        capabilities: {
-          card_payments: { requested: true },
-          transfers: { requested: true },
-        },
-      });
+  const { userId } = req.body;
 
-      // Salva l'account_id nel DB
-      const { error } = await supabase
-        .from("users")
-        .update({ stripe_account_id: account.id })
-        .eq("id", userId);
+  // Recupera email utente da Supabase
+  const { data: user, error } = await supabase
+    .from("users")
+    .select("email")
+    .eq("id", userId)
+    .single();
 
-      if (error) return res.status(400).json({ error: error.message });
+  if (error || !user) return res.status(404).json({ error: "Utente non trovato" });
 
-      // Crea link per il dashboard Express del venditore
-      const accountLink = await stripe.accountLinks.create({
-        account: account.id,
-        refresh_url: `${req.headers.origin}/stripe-setup?refresh=true`,
-        return_url: `${req.headers.origin}/stripe-setup?success=true`,
-        type: "account_onboarding",
-      });
+  try {
+    // Crea account Stripe con Connect
+    const account = await stripe.accounts.create({
+      type: "express",
+      country: "IT",
+      email: user.email,
+    });
 
-      res.status(200).json({ url: accountLink.url });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Errore nella creazione dell’account Stripe" });
-    }
-  } else {
-    res.setHeader("Allow", "POST");
-    res.status(405).end("Method Not Allowed");
+    // Crea link per completare onboarding
+    const accountLink = await stripe.accountLinks.create({
+      account: account.id,
+      refresh_url: `${process.env.NEXT_PUBLIC_URL}/become-vendor`,
+      return_url: `${process.env.NEXT_PUBLIC_URL}/`,
+      type: "account_onboarding",
+    });
+
+    // Salva l'ID Stripe nel database
+    await supabase.from("users").update({ stripe_account_id: account.id }).eq("id", userId);
+
+    res.status(200).json({ url: accountLink.url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Errore nella creazione dell'account Stripe" });
   }
 }

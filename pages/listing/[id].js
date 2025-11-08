@@ -1,11 +1,12 @@
-import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { supabase } from "../../supabaseClient";
 
 export default function ListingPage() {
   const router = useRouter();
   const { id } = router.query;
   const [listing, setListing] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
@@ -19,33 +20,39 @@ export default function ListingPage() {
 
       if (error) console.error(error);
       else setListing(data);
+      setLoading(false);
     };
 
     fetchListing();
   }, [id]);
 
-  const handleBuy = async () => {
-    const res = await fetch("/api/create-checkout-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ listingId: id }),
-    });
-
-    const data = await res.json();
-    if (data.url) window.location.href = data.url;
-    else alert("Errore nella creazione della sessione di pagamento");
+  const handlePurchase = async () => {
+    try {
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listingId: id }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else alert(data.error || "Errore nella creazione della sessione di pagamento");
+    } catch (err) {
+      console.error(err);
+      alert("Errore di connessione al server");
+    }
   };
 
-  if (!listing) return <p>Caricamento annuncio...</p>;
+  if (loading) return <p>Caricamento...</p>;
+  if (!listing) return <p>Annuncio non trovato</p>;
 
   return (
-    <div className="p-6 max-w-md mx-auto bg-white shadow-lg rounded-lg">
-      <h1 className="text-2xl font-bold mb-4">{listing.title}</h1>
-      <p className="mb-4">{listing.description}</p>
-      <p className="mb-4 font-semibold">Prezzo: €{listing.price}</p>
+    <div className="max-w-2xl mx-auto p-4">
+      <h1 className="text-2xl font-bold">{listing.title}</h1>
+      <p className="mt-2">{listing.description}</p>
+      <p className="mt-4 font-semibold">Prezzo: €{listing.price}</p>
       <button
-        onClick={handleBuy}
-        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        onClick={handlePurchase}
+        className="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
       >
         Acquista
       </button>
