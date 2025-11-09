@@ -1,72 +1,15 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
-import ListingForm from "../components/ListingForm";
-import ListingDetail from "../components/ListingDetail";
-import { useRouter } from "next/router";
-
-export default function Home() {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-
-  useEffect(() => {
-    const getSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) console.error(error);
-      setSession(data?.session ?? null);
-      setLoading(false);
-    };
-
-    getSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const handleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin }
-    });
-    if (error) console.error(error.message);
-  };
-
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) console.error(error.message);
-  };
-
-  const handleBecomeSeller = () => {
-    router.push("/become-seller");
-  };
-
-  if (loading) {
-    return <div className="flex justify-center items-center h-screen">Caricamento...</div>;
-  }
-
-  if (!session) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen">
-        <h1 className="text-3xl font-bold mb-4">UniUD StudySwap</h1>
-        <button onClick={handleLogin} className="bg-blue-600 text-white px-6 py-3 rounded">Accedi con Google</button>
-      </div>
-    );
-  }
-import { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
 import ListingDetail from "../components/ListingDetail";
 
 export default function Home() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [listings, setListings] = useState([]);
+  const [showListingDetail, setShowListingDetail] = useState(false);
+  const [selectedListing, setSelectedListing] = useState(null);
 
-  // Recupera sessione e ascolta cambiamenti login/logout
+  // Controllo sessione all'avvio
   useEffect(() => {
     const getSession = async () => {
       const { data, error } = await supabase.auth.getSession();
@@ -77,21 +20,26 @@ export default function Home() {
 
     getSession();
 
+    // Ascolta cambiamenti di sessione
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // Recupera annunci dal database
+  // Recupero degli annunci dal database
   useEffect(() => {
     const fetchListings = async () => {
-      const { data, error } = await supabase.from("listings").select("*");
-      if (error) console.error("Errore fetch listings:", error);
-      setListings(data ?? []);
+      const { data, error } = await supabase
+        .from("listings")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) console.error("Errore nel recupero annunci:", error);
+      else setListings(data);
     };
-
     fetchListings();
   }, []);
 
@@ -110,9 +58,34 @@ export default function Home() {
     if (error) console.error("Errore logout:", error.message);
   };
 
+  const handleListingClick = (listing) => {
+    setSelectedListing(listing);
+    setShowListingDetail(true);
+  };
+
+  const handleCloseDetail = () => {
+    setShowListingDetail(false);
+    setSelectedListing(null);
+  };
+
   const handleBecomeSeller = async () => {
-    // Qui chiamerai API per collegare account Stripe
-    window.alert("Qui si aprirà la schermata per diventare venditore.");
+    if (!session) {
+      alert("Devi essere loggato per diventare venditore!");
+      return;
+    }
+
+    try {
+      // Qui chiami la tua API per creare/collegare account Stripe
+      const response = await fetch("/api/create-seller-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: session.user.id }),
+      });
+      const data = await response.json();
+      if (data.url) window.location.href = data.url; // Redirige a Stripe
+    } catch (error) {
+      console.error("Errore nel diventare venditore:", error);
+    }
   };
 
   if (loading) {
@@ -140,14 +113,24 @@ export default function Home() {
     );
   }
 
+  if (showListingDetail && selectedListing) {
+    return (
+      <ListingDetail
+        listing={selectedListing}
+        onClose={handleCloseDetail}
+        session={session}
+      />
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen bg-gray-50 p-4">
-      <div className="w-full max-w-4xl mb-6 flex justify-between items-center">
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Benvenuto, {session.user.email}</h1>
-        <div className="flex gap-4">
+        <div className="flex space-x-4">
           <button
             onClick={handleBecomeSeller}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg shadow transition"
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg shadow-md transition"
           >
             Diventa venditore
           </button>
@@ -160,7 +143,21 @@ export default function Home() {
         </div>
       </div>
 
-      <ListingDetail listings={listings ?? []} />
+      <h2 className="text-xl font-semibold mb-4 text-gray-700">Marketplace</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {listings.length === 0 && <p className="text-gray-500">Nessun annuncio presente.</p>}
+        {listings.map((listing) => (
+          <div
+            key={listing.id}
+            className="border rounded-lg p-4 shadow hover:shadow-lg cursor-pointer transition"
+            onClick={() => handleListingClick(listing)}
+          >
+            <h3 className="font-bold text-gray-800">{listing.title}</h3>
+            <p className="text-gray-600">{listing.description}</p>
+            <p className="text-gray-800 font-semibold mt-2">{listing.price} €</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
